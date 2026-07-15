@@ -21,6 +21,7 @@ Give ARA the README / spec / design doc of *any* agent — existing or brand-new
 3. [Scope — Does / Does NOT](#3-scope--does--does-not)
 4. [Input contract](#4-input-contract)
 5. [Output contract](#5-output-contract)
+   - [5a. Vague / undetailed inputs — completeness & confidence](#5a-vague--undetailed-inputs--completeness--confidence)
 6. [Architecture — the 8-node workflow](#6-architecture--the-8-node-workflow)
 7. [Scoring rubric — dimension breakdown with framework citations](#7-scoring-rubric)
 8. [Failure clusters — borrowed from Google](#8-failure-clusters)
@@ -29,6 +30,7 @@ Give ARA the README / spec / design doc of *any* agent — existing or brand-new
 11. [Configuration & usage](#11-configuration--usage)
 12. [Governance & continuous improvement](#12-governance--continuous-improvement)
 13. [Source frameworks & research](#13-source-frameworks--research)
+14. [Project status & roadmap](#14-project-status--roadmap)
 
 ---
 
@@ -476,13 +478,30 @@ The three converge on 8 dimensions (see Section 7), and ARA implements this cons
 
 ---
 
-## Next step
+## 14. Project status & roadmap
 
-Send the **5 reference agent READMEs** (existing agents from your team or QE Agentic Hub candidates). I will use them to:
+**Status:** ARA is implemented and working end-to-end. The 8-node LangGraph
+workflow, the cross-vendor rubric, deterministic hard gates, the input-completeness
+& confidence layer, and JSON/Markdown/HTML reporting are all in place and covered
+by the test suite (`python tests/test_ara.py`). The tool runs fully offline with
+the built-in heuristic scorer and upgrades to the LLM scorer automatically when
+Azure OpenAI credentials are present.
 
-1. **Calibrate the point-band criteria** against real examples (so "Adequate" on Security actually matches a human reviewer's judgment)
-2. **Confirm the normalizer handles the range of README styles** your team produces
-3. **Produce 5 sample reports** as a golden test set before we write implementation code
-4. **Identify any framework inputs we're missing** (e.g., if your agents use tool patterns AWS doesn't name, we add a cluster)
+The `examples/` directory ships reference agent READMEs — spanning detailed,
+moderate, and deliberately sparse specs — that act as a golden set for validating
+scoring behavior across the range of README styles.
 
-This golden dataset becomes the benchmark ARA trains against, ensuring the scorer LLM learns what "7/10 safe to deploy" really means in your org's context.
+**Roadmap:**
+- **Calibration set** — expand the golden reference set and track ARA scores
+  against human-reviewer judgments to keep the point bands aligned.
+- **Drift monitoring** — log score distributions and the human-override rate so a
+  drifting rubric or model is caught early (see §12).
+- **Taxonomy growth** — add failure clusters for tool/integration patterns not yet
+  named by the source frameworks as new agent types appear.
+- **CI integration** — wire the CLI's exit codes (0 deployable / 1 conditional /
+  2 not-deployable) into a deployment-gating check for the QE Agentic Hub.
+
+---
+
+_Agent Readiness Analyzer (ARA) — an evidence-based deployment-readiness scorer for
+agentic systems, grounded in the AWS, Google, and Microsoft agent frameworks._

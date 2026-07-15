@@ -298,40 +298,6 @@ ARA can issue a full, high-confidence verdict. Example:
 
 ## 6. Architecture — the 8-node workflow
 
-### Workflow diagram
-
-The end-to-end pipeline. The **amber** stages are the vague-input handling: they
-let ARA score *any* README and, when the input is too thin to certify, return a
-provisional grade plus a requirements checklist to send back to the client.
-
-```mermaid
-flowchart TD
-    A([Agent README / spec<br/>detailed OR vague]):::input --> B[Input Guard<br/>PII masking · injection block · size cap]
-    B --> C[Normalize<br/>agent spec · autonomy L1-L4 · summary]
-    C --> D[Score 8 Dimensions<br/>heuristic offline · or LLM-as-judge]
-    D --> E[Hard Gates<br/>guarded writes · termination · injection<br/>self-deploy · safety screening]
-    E --> F[Input Completeness Assessor<br/>how much can we actually judge?]:::vague
-    F --> G[Input Requirements Builder<br/>required dimensions + parameters]:::vague
-    G --> H[Failure Cluster Detector]
-    H --> I{Assessment<br/>confidence?}:::decision
-    I -->|High / Medium<br/>detailed input| J[Verdict Engine<br/>deterministic score + verdict]
-    I -->|Low<br/>vague input| K[Verdict Engine<br/>PROVISIONAL score<br/>never certified DEPLOYABLE]:::vague
-    J --> L[[Reports<br/>JSON · Markdown · HTML]]
-    K --> L
-    K --> M[[Client Requirements Doc<br/>readme-requirements.md<br/>send back to client]]:::vague
-    L --> N([Verdict:<br/>DEPLOYABLE / CONDITIONAL / NOT_DEPLOYABLE])
-
-    classDef input fill:#eef4ff,stroke:#1f3a5f,stroke-width:2px,color:#1f2733;
-    classDef vague fill:#fff6e5,stroke:#9a6a00,stroke-width:1px,color:#1f2733;
-    classDef decision fill:#f0e8ff,stroke:#5b3a9a,stroke-width:1px,color:#1f2733;
-```
-
-> The **Verdict Engine is deterministic code**, never an LLM — so the tool cannot
-> be "talked into" a higher grade. A failed **CRITICAL** hard gate forces
-> `NOT_DEPLOYABLE` regardless of score or input completeness.
-
-### Detailed node reference
-
 ARA's execution graph (LangGraph StateGraph):
 
 ```

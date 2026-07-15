@@ -1,0 +1,17 @@
+# ARA runs fully offline with ZERO of these installed (stdlib heuristic scorer).
+# Install these to enable the LLM-as-judge path, real LangGraph orchestration,
+# and PDF output.
+
+# --- LLM-as-judge (Azure OpenAI) ---
+langchain-openai>=0.2.0
+langchain-core>=0.3.0
+
+# --- Real LangGraph StateGraph orchestration ---
+langgraph>=0.2.0
+
+# --- Stricter schema validation (optional) ---
+pydantic>=2.0
+
+# --- PDF report output (optional; needs system libs on some platforms) ---
+markdown>=3.5
+weasyprint>=61.0

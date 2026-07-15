@@ -19,6 +19,7 @@ from .guards import run_input_guard, GuardResult
 from .normalize import normalize
 from .scorers import score_all
 from .completeness import assess_completeness
+from .requirements import build_requirements_checklist
 from .clustering import detect_clusters
 from .llm import build_llm
 from .schema import Scorecard
@@ -57,6 +58,16 @@ def node_completeness(state: dict) -> dict:
     # How much did the artifact actually give us to judge? Drives assessment
     # confidence, whether the score is provisional, and the clarifying questions.
     return {"completeness": assess_completeness(state["spec"], state["dimensions"])}
+
+
+def node_requirements(state: dict) -> dict:
+    # The client-facing checklist: which dimensions/parameters must be positively
+    # present for a proper analysis, scoring and deployability check.
+    return {
+        "input_requirements": build_requirements_checklist(
+            state["dimensions"], state["hard_gates"]
+        )
+    }
 
 
 def node_clusters(state: dict) -> dict:
@@ -112,6 +123,7 @@ def node_report(state: dict) -> dict:
         assessment_confidence=state.get("assessment_confidence", "high"),
         provisional=state.get("provisional", False),
         completeness=state.get("completeness"),
+        input_requirements=state.get("input_requirements", []),
         total_score=state["total_score"],
         raw_score=state["raw_score"],
         verdict=state["verdict"],
@@ -132,6 +144,7 @@ _NODE_SEQUENCE = [
     node_score,
     node_gates,
     node_completeness,
+    node_requirements,
     node_clusters,
     node_verdict,
     node_report,
@@ -159,6 +172,7 @@ class _ARAState(TypedDict, total=False):
     dimensions: list
     hard_gates: list
     completeness: Any
+    input_requirements: list
     failure_clusters: list
     raw_score: float
     total_score: float
@@ -181,7 +195,7 @@ def _run_langgraph(state: dict) -> dict:
     g = StateGraph(_ARAState)
     names = [
         "input_guard", "normalize", "score", "gates",
-        "completeness", "clusters", "verdict", "report",
+        "completeness", "requirements", "clusters", "verdict", "report",
     ]
     for name, fn in zip(names, _NODE_SEQUENCE):
         g.add_node(name, fn)

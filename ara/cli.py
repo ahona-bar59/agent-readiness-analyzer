@@ -67,9 +67,12 @@ def _print_summary(res: dict, fmt: str) -> None:
     if comp:
         print(f"  Input completeness: {comp.pct}% ({comp.tier})   "
               f"assessment confidence: {card.assessment_confidence}")
-        if comp.clarifying_questions:
-            print(f"  ? {len(comp.clarifying_questions)} clarifying question(s) "
-                  f"needed for a full assessment (see report).")
+    missing_mandatory = [
+        r for r in card.input_requirements if r.mandatory and r.status != "PRESENT"
+    ]
+    if card.provisional and missing_mandatory:
+        print(f"  ! {len(missing_mandatory)} mandatory requirement(s) not documented "
+              f"- client requirements doc generated to send back.")
     print("-" * 72)
     for d in card.dimensions:
         print(f"    {d.score:>3}/2  {d.name}")

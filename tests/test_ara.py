@@ -186,6 +186,65 @@ def test_vague_but_dangerous_agent_still_not_deployable():
     assert card.verdict == "NOT_DEPLOYABLE"
 
 
+def test_vague_readme_produces_requirements_checklist():
+    """A vague README must yield a checklist telling the client which dimensions
+    and parameters must be positively present — mandatory items flagged, with the
+    specific expected parameters listed — so it can be sent back."""
+    text = (Path(__file__).resolve().parents[1] / "examples" / "vague_agent.md").read_text(
+        encoding="utf-8"
+    )
+    card, _, _ = analyze(text, _settings(), use_langgraph=False)
+    reqs = card.input_requirements
+    assert reqs, "expected an input-requirements checklist"
+    # The safety triad dimensions must be present and flagged mandatory.
+    by_area = {r.area: r for r in reqs}
+    for area in ("Security & Safety", "Reliability & Robustness", "Autonomy & Human Oversight"):
+        assert area in by_area, area
+        assert by_area[area].mandatory is True
+    # A missing mandatory dimension carries the specific parameters to document.
+    sec = by_area["Security & Safety"]
+    assert sec.status in ("MISSING", "PARTIAL")
+    assert any("injection" in p.lower() for p in sec.required_parameters)
+    # Hard-gate safety controls appear as mandatory requirement items too.
+    assert any(r.category == "gate" and r.mandatory for r in reqs)
+
+
+def test_client_requirements_doc_is_generated_for_vague_input():
+    """The standalone client-facing requirements doc is written for a vague
+    input and names the outstanding mandatory areas."""
+    import tempfile
+    from ara.report import to_client_requirements, write_outputs
+
+    text = (Path(__file__).resolve().parents[1] / "examples" / "vague_agent.md").read_text(
+        encoding="utf-8"
+    )
+    card, reasons, _ = analyze(text, _settings(), use_langgraph=False)
+    doc = to_client_requirements(card)
+    assert "README Requirements" in doc
+    assert "Mandatory" in doc
+    assert "Security & Safety" in doc
+    with tempfile.TemporaryDirectory() as d:
+        written = write_outputs(card, Path(d), "all", verdict_reasons=reasons)
+    assert any("readme-requirements.md" in w for w in written)
+
+
+def test_detailed_agent_has_no_provisional_requirements_doc():
+    """A fully-documented agent is not provisional, so no client requirements
+    doc is emitted."""
+    import tempfile
+    from ara.report import write_outputs
+
+    text = (Path(__file__).resolve().parents[1] / "examples" / "test_case_creation_agent.md").read_text(
+        encoding="utf-8"
+    )
+    card, reasons, _ = analyze(text, _settings(), use_langgraph=False)
+    with tempfile.TemporaryDirectory() as d:
+        written = write_outputs(card, Path(d), "all", verdict_reasons=reasons)
+    assert not any("readme-requirements.md" in w for w in written)
+    # The checklist itself is still produced (for the in-report table).
+    assert card.input_requirements
+
+
 def test_verdict_is_deterministic():
     text = (Path(__file__).resolve().parents[1] / "examples" / "test_case_creation_agent.md").read_text(
         encoding="utf-8"

@@ -85,6 +85,23 @@ class InputCompleteness:
         return self.confidence == "low"
 
 
+RequirementStatus = Literal["PRESENT", "PARTIAL", "MISSING"]
+
+
+@dataclass
+class RequirementItem:
+    """One entry in the client-facing input-requirements checklist: an area the
+    README must document, its current state in the artifact, and the specific
+    parameters expected. `mandatory` items block a clean deployability decision."""
+
+    area: str
+    category: Literal["dimension", "gate"]
+    status: RequirementStatus
+    mandatory: bool = False
+    required_parameters: list[str] = field(default_factory=list)
+    note: str = ""
+
+
 @dataclass
 class Scorecard:
     agent_name: str
@@ -99,6 +116,7 @@ class Scorecard:
     assessment_confidence: Confidence = "high"   # how far the input can be trusted
     provisional: bool = False          # True when scored from a sparse/vague input
     completeness: InputCompleteness | None = None
+    input_requirements: list[RequirementItem] = field(default_factory=list)
     dimensions: list[DimensionScore] = field(default_factory=list)
     hard_gates: list[HardGate] = field(default_factory=list)
     failure_clusters: list[FailureCluster] = field(default_factory=list)
@@ -152,6 +170,17 @@ class Scorecard:
                 if self.completeness
                 else None
             ),
+            "inputRequirements": [
+                {
+                    "area": r.area,
+                    "category": r.category,
+                    "status": r.status,
+                    "mandatory": r.mandatory,
+                    "requiredParameters": r.required_parameters,
+                    "note": r.note,
+                }
+                for r in self.input_requirements
+            ],
             "autonomyLevel": self.autonomy_level,
             "hardGates": [
                 {

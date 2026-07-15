@@ -177,6 +177,16 @@ ARA always emits a JSON scorecard; the report is rendered from it.
     "missingAreas": [],          // dimensions with no evidence at all
     "clarifyingQuestions": []    // targeted questions to unlock a full assessment
   },
+  "inputRequirements": [         // checklist to send back to the client (see §5a)
+    {
+      "area": "Security & Safety",
+      "category": "dimension",   // dimension | gate
+      "status": "MISSING",       // PRESENT | PARTIAL | MISSING
+      "mandatory": true,         // blocks a deployability decision until documented
+      "requiredParameters": ["Prompt-injection / jailbreak defense on untrusted input", "..."]
+    }
+    // ... one entry per hard gate + per dimension
+  ],
   "autonomyLevel": "L2",         // L1 | L2 | L3 | L4 (detected)
   "hardGates": [
     { "gate": "guarded_writes", "status": "PASS", "evidence": "persist node checks tests_approved" },
@@ -255,6 +265,35 @@ report (e.g. *"Reliability & Robustness: what guarantees the agent terminates…
 Answering them — or adding the detail to the README — lets ARA lift the provisional
 grade to a final, high-confidence verdict.
 
+### Input requirements checklist — what to send back to the client
+
+Beyond the questions, ARA produces an explicit **requirements checklist**: for
+each of the 8 dimensions and every hard-gate safety control, it states the
+concrete parameters the README must positively document, and marks each
+**PRESENT / PARTIAL / MISSING** against the artifact. Requirements are split into:
+
+- **Mandatory** — the safety triad (Security, Reliability, Autonomy) and all
+  hard-gate controls (guarded writes, termination bound, injection defense,
+  no self-deploy, PII/harmful-content handling). These **block** a deployability
+  decision until documented.
+- **Recommended** — the remaining dimensions, needed for a full score.
+
+When the input is vague (provisional), ARA additionally writes a standalone,
+**client-facing document** — `<agent>.readme-requirements.md` — that lists only
+the outstanding items as a fill-in checklist, ready to send straight back to the
+client. Once they update the README to cover the mandatory items and resubmit,
+ARA can issue a full, high-confidence verdict. Example:
+
+```
+## Mandatory — required before a deployability decision
+### Security & Safety  ( currently not documented )
+- [ ] Prompt-injection / jailbreak defense on untrusted input
+- [ ] PII / sensitive-data handling (masking, redaction)
+- [ ] Input validation and size limits
+- [ ] Least-privilege access to tools and data
+...
+```
+
 ---
 
 ## 6. Architecture — the 8-node workflow
@@ -278,6 +317,8 @@ Input Artifact
 [Hard Gates Evaluator]        -> PASS/FAIL check (gates override score)
       |
 [Input Completeness Assessor] -> Measure how vague the input is -> confidence + clarifying questions (§5a)
+      |
+[Input Requirements Builder]  -> Checklist of required dimensions/parameters to send back to the client (§5a)
       |
 [Failure Cluster Detector]    -> Group gaps into semantic clusters (Google method)
       |

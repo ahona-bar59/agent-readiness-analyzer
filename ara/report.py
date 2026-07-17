@@ -33,6 +33,20 @@ def _bar(score: float, out_of: float = 2.0) -> str:
     return "█" * filled + "·" * (_BAR_WIDTH - filled)
 
 
+import re as _re
+
+_GAP_RE = _re.compile(r"^no explicit evidence of '([^']+)'\.?$", _re.IGNORECASE)
+
+
+def _reword_member(gap: str) -> str:
+    """Turn a raw gap ("No explicit evidence of 'X'.") into a friendlier
+    "Not documented: X" for the failure-cluster list."""
+    from .rubric import display_term
+
+    m = _GAP_RE.match(gap.strip())
+    return f"Not documented: {display_term(m.group(1))}" if m else gap
+
+
 def to_json(card: Scorecard, verdict_reasons: list[str] | None = None) -> str:
     data = card.to_dict()
     if verdict_reasons:
@@ -164,19 +178,40 @@ def to_markdown(card: Scorecard, verdict_reasons: list[str] | None = None) -> st
     if card.failure_clusters:
         L.append("## Failure clusters")
         L.append("")
+        L.append("_Individual gaps grouped into the systemic risks they add up to._")
+        L.append("")
         for c in card.failure_clusters:
-            L.append(f"### {c.cluster}  _[{c.severity}]_")
-            L.append(f"*Source: {c.framework_source}*")
+            L.append(f"### {c.cluster} &nbsp; `{c.severity.upper()}`")
+            if c.description:
+                L.append(f"{c.description}")
+            L.append("")
+            L.append("**Contributing gaps:**")
             for m in c.members:
-                L.append(f"- {m}")
+                L.append(f"- {_reword_member(m)}")
+            L.append("")
+            L.append(f"<sub>Framework source: {c.framework_source}</sub>")
             L.append("")
 
     # Recommendations
     if card.recommendations:
-        L.append("## Recommendations — what reaches 10")
-        for r in card.recommendations:
-            L.append(f"- {r}")
+        highs = [r for r in card.recommendations if r.priority == "high"]
+        others = [r for r in card.recommendations if r.priority != "high"]
+        L.append("## Recommendations — how to raise the score")
         L.append("")
+        if highs:
+            L.append("### 🔴 Priority fixes")
+            L.append("_Address these first — they block or cap deployment._")
+            L.append("")
+            for r in highs:
+                L.append(f"- **{r.area}** — {r.action}")
+            L.append("")
+        if others:
+            L.append("### 🟡 Further improvements")
+            L.append("_These lift the score toward a full, confident pass._")
+            L.append("")
+            for r in others:
+                L.append(f"- **{r.area}** — {r.action}")
+            L.append("")
 
     if card.insufficient_evidence:
         L.append("## Insufficient evidence")
@@ -307,7 +342,22 @@ def to_html(card: Scorecard, verdict_reasons: list[str] | None = None) -> str:
   .about .lbl {{ text-transform:uppercase; letter-spacing:.04em; font-size:12px;
                  font-weight:700; color:#1f3a5f; margin-bottom:4px; }}
   .about p {{ margin:0; color:#2b3543; }}
-  .cluster {{ border-left:4px solid #d99a00; padding:6px 12px; margin:10px 0; background:#fffaf0; }}
+  .cluster {{ border:1px solid #e2e8f0; border-left:4px solid #d99a00; padding:12px 16px;
+             margin:12px 0; background:#fffdf7; border-radius:8px; }}
+  .cluster.sev-critical {{ border-left-color:#a3232a; background:#fdf7f7; }}
+  .cluster.sev-high {{ border-left-color:#d99a00; }}
+  .cluster.sev-medium {{ border-left-color:#5b8fb0; }}
+  .cluster .chead {{ font-size:16px; font-weight:700; color:#1f2733; }}
+  .cluster .cdesc {{ margin:6px 0 8px; color:#3a4453; }}
+  .pill {{ display:inline-block; font-size:11px; font-weight:700; padding:2px 9px;
+          border-radius:11px; text-transform:uppercase; letter-spacing:.03em; vertical-align:middle; }}
+  .pill-critical {{ color:#a3232a; background:#fdeaea; }}
+  .pill-high {{ color:#9a3d00; background:#fdeee0; }}
+  .pill-medium {{ color:#31597a; background:#e8f1f8; }}
+  .rec {{ display:flex; gap:12px; align-items:flex-start; padding:10px 14px; margin:8px 0;
+         border:1px solid #e6ebf1; border-radius:8px; background:#fbfcfe; }}
+  .rec .area {{ font-weight:700; color:#1f3a5f; }}
+  .recgroup-lbl {{ font-size:13px; color:#5b6675; margin:4px 0 2px; }}
   ul {{ margin:6px 0; }} code {{ background:#f1f3f5; padding:1px 5px; border-radius:4px; }}
   .foot {{ color:#8a94a3; font-size:12px; margin-top:40px; border-top:1px solid #e2e8f0; padding-top:12px; }}
 </style></head><body>""")
@@ -403,14 +453,40 @@ def to_html(card: Scorecard, verdict_reasons: list[str] | None = None) -> str:
 
     if card.failure_clusters:
         parts.append("<h2>Failure clusters</h2>")
+        parts.append("<p class='frefs'>Individual gaps grouped into the systemic risks "
+                     "they add up to.</p>")
         for c in card.failure_clusters:
-            parts.append(f"<div class='cluster'><b>{_e(c.cluster)}</b> [{_e(c.severity)}]<br>"
-                         f"<span class='frefs'>{_e(c.framework_source)}</span><ul>"
-                         + "".join(f"<li>{_e(m)}</li>" for m in c.members) + "</ul></div>")
+            sev = _e(c.severity)
+            pill = f"pill-{sev}" if sev in ("critical", "high", "medium") else "pill-medium"
+            desc = f"<div class='cdesc'>{_e(c.description)}</div>" if c.description else ""
+            members = "".join(f"<li>{_e(_reword_member(m))}</li>" for m in c.members)
+            parts.append(
+                f"<div class='cluster sev-{sev}'>"
+                f"<div class='chead'>{_e(c.cluster)} &nbsp;<span class='pill {pill}'>{sev}</span></div>"
+                f"{desc}"
+                f"<b>Contributing gaps:</b><ul>{members}</ul>"
+                f"<span class='frefs'>Framework source: {_e(c.framework_source)}</span></div>"
+            )
 
     if card.recommendations:
-        parts.append("<h2>Recommendations - what reaches 10</h2><ul>"
-                     + "".join(f"<li>{_e(r)}</li>" for r in card.recommendations) + "</ul>")
+        highs = [r for r in card.recommendations if r.priority == "high"]
+        others = [r for r in card.recommendations if r.priority != "high"]
+        parts.append("<h2>Recommendations — how to raise the score</h2>")
+
+        def _rec_block(items, label, pill_cls, pill_txt):
+            if not items:
+                return
+            parts.append(f"<div class='recgroup-lbl'>{label}</div>")
+            for r in items:
+                parts.append(
+                    f"<div class='rec'><span class='pill {pill_cls}'>{pill_txt}</span>"
+                    f"<div><span class='area'>{_e(r.area)}</span> — {_e(r.action)}</div></div>"
+                )
+
+        _rec_block(highs, "Priority fixes — address these first (block or cap deployment)",
+                   "pill-critical", "Priority")
+        _rec_block(others, "Further improvements — lift the score toward a confident pass",
+                   "pill-medium", "Improve")
 
     if card.insufficient_evidence:
         parts.append("<h2>Insufficient evidence</h2><ul>"

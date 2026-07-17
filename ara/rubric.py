@@ -156,6 +156,39 @@ DIMENSIONS: list[Dimension] = [
 DIMENSIONS_BY_KEY = {d.key: d for d in DIMENSIONS}
 
 
+# Friendly display names for the lower-cased rubric `expected` phrases, so reports
+# read as human prose ("least-privilege access") rather than raw match tokens
+# ("least privilege") or truncated stems ("graceful degrad").
+EXPECTED_DISPLAY: dict[str, str] = {
+    "prompt injection": "prompt-injection defense",
+    "pii": "PII handling",
+    "least privilege": "least-privilege access",
+    "fallback": "fallback paths",
+    "graceful degrad": "graceful degradation",
+    "human approval": "human approval",
+    "gate": "human approval gates",
+    "success metric": "success metrics",
+    "measurable": "measurable success criteria",
+    "guarded write": "guarded writes",
+    "scoped": "scoped tool access",
+    "cost": "cost controls",
+    "tracing": "tracing",
+    "drift": "drift monitoring",
+    "rollback": "rollback support",
+    "node": "node / graph structure",
+    "state": "state management",
+    "scope": "clear in / out-of-scope",
+}
+
+
+def display_term(term: str) -> str:
+    """Human-friendly label for a rubric expected-phrase (falls back to the raw
+    term, with common acronyms upper-cased)."""
+    if term in EXPECTED_DISPLAY:
+        return EXPECTED_DISPLAY[term]
+    return "PII" if term == "pii" else term
+
+
 # --------------------------------------------------------------------------- #
 # Hard gates — non-negotiable safety conditions. A FAIL forces NOT_DEPLOYABLE
 # when strict_gates is on, regardless of total score. Each gate is evaluated by
@@ -214,15 +247,51 @@ class ClusterDef:
     severity: str
     framework_source: str
     trigger_dimensions: list[str]
+    description: str = ""
 
 
 CLUSTER_TAXONOMY: list[ClusterDef] = [
-    ClusterDef("Unsafe autonomy", "critical", "AWS AGENTSEC02/08; Google autonomy gaps", ["autonomy", "security"]),
-    ClusterDef("Privilege escalation", "critical", "AWS AGENTSEC07", ["autonomy"]),
-    ClusterDef("Weak input defense", "high", "AWS AGENTSEC04; Google Safety", ["security"]),
-    ClusterDef("Untrusted output handling", "high", "Google Failure Cluster: Data Leakage", ["security", "tools"]),
-    ClusterDef("Tool-use errors", "medium", "Google Tool-Use Quality; AWS AGENTSEC03", ["tools"]),
-    ClusterDef("Goal misalignment", "medium", "Google Task Success; MS Intent Resolution", ["task_effectiveness"]),
-    ClusterDef("Blind operation", "high", "AWS AGENTOPS05/06; MS decay monitoring", ["observability"]),
-    ClusterDef("Fragile reliability", "high", "AWS AGENTREL", ["reliability"]),
+    ClusterDef(
+        "Unsafe autonomy", "critical", "AWS AGENTSEC02/08; Google autonomy gaps",
+        ["autonomy", "security"],
+        "The agent acts with meaningful autonomy, but the safety controls around those "
+        "actions aren't evidenced — actions could take effect without adequate guarding.",
+    ),
+    ClusterDef(
+        "Privilege escalation", "critical", "AWS AGENTSEC07", ["autonomy"],
+        "Signals suggest the agent could expand its own permissions or autonomy — this "
+        "must never happen without explicit human control.",
+    ),
+    ClusterDef(
+        "Weak input defense", "high", "AWS AGENTSEC04; Google Safety", ["security"],
+        "Untrusted input isn't clearly defended (e.g. prompt injection), leaving the "
+        "agent open to manipulation.",
+    ),
+    ClusterDef(
+        "Untrusted output handling", "high", "Google Failure Cluster: Data Leakage",
+        ["security", "tools"],
+        "Tool or model outputs may carry unsanitised or sensitive data downstream, "
+        "creating a data-leakage risk.",
+    ),
+    ClusterDef(
+        "Tool-use errors", "medium", "Google Tool-Use Quality; AWS AGENTSEC03", ["tools"],
+        "Tool selection, scoping, or parameters aren't clearly governed, so the agent "
+        "may call tools incorrectly or unsafely.",
+    ),
+    ClusterDef(
+        "Goal misalignment", "medium", "Google Task Success; MS Intent Resolution",
+        ["task_effectiveness"],
+        "Success criteria and intent-grounding are thin, so the agent may drift from "
+        "what the user actually asked for.",
+    ),
+    ClusterDef(
+        "Blind operation", "high", "AWS AGENTOPS05/06; MS decay monitoring", ["observability"],
+        "There's little tracing, monitoring, or drift detection — problems in production "
+        "would be hard to see or catch.",
+    ),
+    ClusterDef(
+        "Fragile reliability", "high", "AWS AGENTREL", ["reliability"],
+        "Failure handling (termination bounds, retries, fallbacks) isn't well evidenced, "
+        "so the agent may behave unpredictably under stress.",
+    ),
 ]

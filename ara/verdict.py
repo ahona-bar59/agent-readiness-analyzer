@@ -304,18 +304,68 @@ def apply_confidence_cap(
     return verdict, True, reasons
 
 
+_QUOTED_RE = re.compile(r"'([^']+)'")
+
+
+def _missing_terms(gaps: list[str]) -> list[str]:
+    """Pull the quoted rubric phrases out of gap strings like
+    "No explicit evidence of 'prompt injection'." and map them to friendly labels."""
+    from .rubric import display_term
+
+    terms: list[str] = []
+    for g in gaps:
+        m = _QUOTED_RE.search(g)
+        if m:
+            label = display_term(m.group(1))
+            if label not in terms:
+                terms.append(label)
+    return terms
+
+
+def _join_terms(items: list[str]) -> str:
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
 def build_recommendations(
     dimensions: list[DimensionScore], hard_gates: list[HardGate]
-) -> list[str]:
-    recs: list[str] = []
+) -> list["Recommendation"]:
+    """Prioritised, action-oriented recommendations. Failed hard gates come first
+    as high-priority fixes (phrased as the control to add); weak dimensions follow
+    as medium-priority improvements (phrased as what to document)."""
+    from .requirements import GATE_REQUIREMENTS
+    from .schema import Recommendation
+
+    recs: list[Recommendation] = []
+
+    # 1. Failed hard gates -> high-priority fixes.
     for g in hard_gates:
         if g.status == "FAIL":
-            recs.append(f"[gate] Fix '{g.gate}': {g.evidence}")
-    # Lowest-scoring dimensions first.
+            action = GATE_REQUIREMENTS.get(g.gate) or g.evidence
+            priority = "high" if g.severity in ("critical", "high") else "medium"
+            recs.append(
+                Recommendation(
+                    priority=priority,
+                    area=g.gate.replace("_", " ").title(),
+                    action=action,
+                )
+            )
+
+    # 2. Weakest dimensions -> improvements, phrased positively.
     for d in sorted(dimensions, key=lambda x: x.score):
         if d.score < 2.0 and d.gaps:
-            recs.append(f"[{d.name}] {d.gaps[0]}")
-    return recs[:10]
+            terms = _missing_terms(d.gaps)
+            action = (
+                f"Document {_join_terms(terms[:3])}."
+                if terms
+                else d.gaps[0]
+            )
+            recs.append(Recommendation(priority="medium", area=d.name, action=action))
+
+    return recs[:12]
 
 
 def collect_insufficient_evidence(dimensions: list[DimensionScore]) -> list[str]:

@@ -55,6 +55,20 @@ class FailureCluster:
     severity: Severity
     members: list[str] = field(default_factory=list)
     framework_source: str = ""
+    description: str = ""          # plain-English "what this means"
+
+
+@dataclass
+class Recommendation:
+    """One actionable, prioritised recommendation for raising the score.
+
+    `priority` groups the report ("Priority fixes" vs "Further improvements");
+    `area` is the gate or dimension it relates to; `action` is phrased as a
+    positive instruction ("Add …", "Document …")."""
+
+    priority: Literal["high", "medium", "low"]
+    area: str
+    action: str
 
 
 # Documentation-completeness tiers, in descending order of detail. They drive the
@@ -120,7 +134,7 @@ class Scorecard:
     dimensions: list[DimensionScore] = field(default_factory=list)
     hard_gates: list[HardGate] = field(default_factory=list)
     failure_clusters: list[FailureCluster] = field(default_factory=list)
-    recommendations: list[str] = field(default_factory=list)
+    recommendations: list[Recommendation] = field(default_factory=list)
     insufficient_evidence: list[str] = field(default_factory=list)
 
     def validate(self) -> None:
@@ -207,11 +221,15 @@ class Scorecard:
                 {
                     "cluster": c.cluster,
                     "severity": c.severity,
+                    "description": c.description,
                     "framework_source": c.framework_source,
                     "members": c.members,
                 }
                 for c in self.failure_clusters
             ],
-            "recommendations": self.recommendations,
+            "recommendations": [
+                {"priority": r.priority, "area": r.area, "action": r.action}
+                for r in self.recommendations
+            ],
             "insufficientEvidence": self.insufficient_evidence,
         }

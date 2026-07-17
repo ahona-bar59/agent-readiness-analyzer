@@ -42,6 +42,7 @@ def detect_clusters(dimensions: list[DimensionScore]) -> list[FailureCluster]:
                     severity=cdef.severity,
                     members=unique,
                     framework_source=cdef.framework_source,
+                    description=cdef.description,
                 )
             )
     return clusters

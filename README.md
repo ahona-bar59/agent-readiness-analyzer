@@ -206,13 +206,17 @@ ARA always emits a JSON scorecard; the report is rendered from it.
   ],
   "failureClusters": [
     {
-      "cluster": "Untrusted tool-output handling",
-      "severity": "medium",
-      "framework_source": "Google Failure Cluster Analysis",
-      "members": ["PII in MCP responses not filtered", "Cached tool outputs not sanitized"]
+      "cluster": "Untrusted output handling",
+      "severity": "high",
+      "description": "Tool or model outputs may carry unsanitised or sensitive data downstream, creating a data-leakage risk.",
+      "framework_source": "Google Failure Cluster: Data Leakage",
+      "members": ["Not documented: PII handling", "Not documented: prompt-injection defense"]
     }
   ],
-  "recommendations": ["Add PII interception at the tool-server layer", "Formalize tools as MCP servers"],
+  "recommendations": [                         // prioritised, action-oriented
+    { "priority": "high", "area": "Injection Defense", "action": "Add prompt-injection / jailbreak protection for untrusted input." },
+    { "priority": "medium", "area": "Security & Safety", "action": "Document prompt-injection defense, PII handling, and least-privilege access." }
+  ],
   "insufficientEvidence": ["No explicit cost/latency benchmark provided"]
 }
 ```
